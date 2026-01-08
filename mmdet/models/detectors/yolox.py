@@ -1,4 +1,8 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import warnings
+from typing import List, Union
+
+import torch
 from mmdet.registry import MODELS
 from mmdet.utils import ConfigType, OptConfigType, OptMultiConfig
 from .single_stage import SingleStageDetector
@@ -41,3 +45,53 @@ class YOLOX(SingleStageDetector):
             test_cfg=test_cfg,
             data_preprocessor=data_preprocessor,
             init_cfg=init_cfg)
+
+    def extract_cam_features(self,
+                            x: torch.Tensor,
+                            target_layer: str = 'neck') -> Union[torch.Tensor, List[torch.Tensor]]:
+        """Extract features for CAM (Class Activation Mapping) computation.
+
+        This method extracts intermediate features from specified layers
+        for visualization and interpretation purposes.
+
+        Args:
+            x (torch.Tensor): Input image tensor of shape (N, C, H, W)
+            target_layer (str): Target layer for feature extraction.
+                Options: 'backbone', 'neck', 'head'
+                - 'backbone': Returns backbone output features
+                - 'neck': Returns neck output (multi-scale features)
+                - 'head': Not recommended, would require head modifications
+                Defaults to 'neck'
+
+        Returns:
+            Union[torch.Tensor, List[torch.Tensor]]:
+                - If target_layer='backbone': Returns tensor of shape (N, C, H, W)
+                - If target_layer='neck': Returns list of tensors for multi-scale features
+
+        Examples:
+            >>> model = init_model('yolox_s.py', 'yolox_s.pth')
+            >>> img = torch.rand(1, 3, 640, 640)
+            >>> # Get neck features (multi-scale)
+            >>> neck_feats = model.extract_cam_features(img, 'neck')
+            >>> print(len(neck_feats))  # 3 (for 3 scales)
+            >>> # Get backbone features
+            >>> backbone_feats = model.extract_cam_features(img, 'backbone')
+        """
+        if target_layer == 'backbone':
+            # Extract backbone features
+            x = self.backbone(x)
+            return x
+        elif target_layer == 'neck':
+            # Extract neck features (multi-scale)
+            x = self.extract_feat(x)
+            return x
+        elif target_layer == 'head':
+            # Head extraction is more complex as it involves multiple branches
+            # For now, we return neck features as head's input
+            warnings.warn("Extracting head features is not fully supported. "
+                         "Returning neck features instead.")
+            x = self.extract_feat(x)
+            return x
+        else:
+            raise ValueError(f"Unsupported target_layer: {target_layer}. "
+                           f"Choose from ['backbone', 'neck'].")

@@ -1,4 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+from .cam_hook import CAMVisualizationHook
 from .checkloss_hook import CheckInvalidLossHook
 from .mean_teacher_hook import MeanTeacherHook
 from .memory_profiler_hook import MemoryProfilerHook
@@ -17,5 +18,5 @@ __all__ = [
     'SetEpochInfoHook', 'MemoryProfilerHook', 'DetVisualizationHook',
     'NumClassCheckHook', 'MeanTeacherHook', 'trigger_visualization_hook',
     'PipelineSwitchHook', 'TrackVisualizationHook',
-    'GroundingVisualizationHook'
+    'GroundingVisualizationHook', 'CAMVisualizationHook'
 ]
