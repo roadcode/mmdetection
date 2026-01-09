@@ -12,11 +12,13 @@ from pathlib import Path
 import mmcv
 import numpy as np
 import torch
+from mmcv.transforms import Compose
 from mmengine.config import Config
+from mmengine.dataset import default_collate
 from mmengine.runner import load_checkpoint
 
 from mmdet.registry import MODELS
-from mmdet.utils import cam_utils
+from mmdet.utils import cam_utils, get_test_pipeline_cfg
 from mmdet.visualization import CAMVisualizer
 
 
@@ -89,22 +91,21 @@ def main():
     img = mmcv.imread(args.img)
     img_rgb = mmcv.bgr2rgb(img)
 
-    # Prepare input tensor
-    from mmdet.registry import MODELS
-    from mmengine.registry import DATA_PREPROCESSORS
+    # Get test pipeline from config
+    test_pipeline = get_test_pipeline_cfg(cfg)
+    test_pipeline = Compose(test_pipeline)
 
-    # Get data preprocessor
-    if 'data_preprocessor' in cfg.model:
-        preprocessor = DATA_PREPROCESSORS.build(cfg.model.data_preprocessor)
-    else:
-        from mmdet.models.data_preprocessors import DetDataPreprocessor
-        preprocessor = DetDataPreprocessor(mean=None, std=None, bgr_to_rgb=True,
-                                           pad_size_divisor=32)
+    # Prepare data using test pipeline
+    data_ = dict(img=img_rgb, img_id=0)
+    data_ = test_pipeline(data_)
 
-    # Preprocess image
-    data = {'inputs': img_rgb, 'batch_input_shape': (img_rgb.shape[0], img_rgb.shape[1])}
-    preprocessed = preprocessor([data], training=False)
-    img_tensor = preprocessed['inputs'].to(args.device)
+    # Wrap data in list format for model input
+    data_['inputs'] = [data_['inputs']]
+    data_['data_samples'] = [data_['data_samples']]
+
+    # Use model's data_preprocessor for final preprocessing
+    data = model.data_preprocessor(data_, training=False)
+    img_tensor = data['inputs'].to(args.device)
 
     # Initialize CAM
     print(f"Initializing {args.method.upper()} CAM...")
